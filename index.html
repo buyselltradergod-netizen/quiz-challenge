@@ -1,0 +1,676 @@
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+
+/* ========================================================================
+   PART 1: DATA & CONFIGURATION
+   (In a real app, this would be in 'data/constants.js' and 'data/questions.js')
+   ======================================================================== */
+
+const COLORS = {
+  white: '#FFFFFF',
+  black: '#000000',
+  green: '#16a34a',
+  red: '#dc2626',
+  gray: '#e5e7eb',
+  darkGray: '#4b5563',
+  warning: '#f59e0b',
+  purple: '#8b5cf6',
+  indigo: '#4f46e5',
+};
+
+const MOCK_SUBJECTS = {
+  'Class 9': ['Math', 'Science', 'English'],
+  'Class 10': ['Math', 'Science', 'English'],
+  'Class 11': ['Physics', 'Chemistry', 'Math'],
+  'Class 12': ['Physics', 'Chemistry', 'Math'],
+};
+
+// Lightweight Database for Demo
+const QUESTIONS_DB = {
+  'Class 10': {
+    'Math': [
+      { q: "NCERT: HCF of 135 and 225?", opts: ["45", "90", "35", "55"], c: 0, diff: 'Easy' },
+      { q: "NCERT: Distance of (2,3) from x-axis?", opts: ["3 units", "2 units", "5 units", "√13"], c: 0, diff: 'Easy' },
+      { q: "Imp: If HCF(306, 657) = 9, find LCM.", opts: ["22338", "22330", "23338", "None"], c: 0, diff: 'Medium' },
+      { q: "Imp: Which term of AP 3, 8, 13... is 78?", opts: ["16th", "15th", "18th", "20th"], c: 0, diff: 'Medium' },
+      { q: "Case Study: Ladder 15m reaches window 9m high. Base?", opts: ["12m", "10m", "8m", "11m"], c: 0, diff: 'Hard' },
+      { q: "Competency: Prob. product of 2 dice numbers is prime?", opts: ["1/6", "5/36", "1/4", "2/9"], c: 0, diff: 'Hard' },
+    ],
+    'Science': [
+      { q: "NCERT: SI unit of current?", opts: ["Ampere", "Volt", "Ohm", "Watt"], c: 0, diff: 'Easy' },
+      { q: "NCERT: pH of neutral solution?", opts: ["7", "0", "14", "1"], c: 0, diff: 'Easy' },
+      { q: "Imp: Why is sky blue?", opts: ["Scattering", "Refraction", "Dispersion", "Reflection"], c: 0, diff: 'Medium' },
+      { q: "Imp: Bleaching powder formula?", opts: ["CaOCl2", "CaSO4", "NaHCO3", "NaCl"], c: 0, diff: 'Medium' },
+      { q: "Assertion: Veins have thin walls. Reason: Low pressure.", opts: ["Both true, R explains A", "Both true, R not A", "A true, R false", "A false"], c: 0, diff: 'Hard' },
+      { q: "Logic: Resistance wire cut into 5 parts, connected parallel?", opts: ["R/25", "R/5", "5R", "25R"], c: 0, diff: 'Hard' },
+    ]
+  },
+  'Class 12': {
+    'Physics': [
+      { q: "NCERT: Unit of Magnetic Flux?", opts: ["Weber", "Tesla", "Gauss", "Henry"], c: 0, diff: 'Easy' },
+      { q: "NCERT: Speed of light?", opts: ["3x10^8 m/s", "330 m/s", "Infinite", "0"], c: 0, diff: 'Easy' },
+      { q: "Imp: Gauss Law relates Flux and?", opts: ["Charge", "Field", "Distance", "Potential"], c: 0, diff: 'Medium' },
+      { q: "Imp: Phenomenon proving transverse light?", opts: ["Polarization", "Interference", "Diffraction", "Refraction"], c: 0, diff: 'Medium' },
+      { q: "Competency: Graph Stopping Potential vs Freq slope?", opts: ["h/e", "h", "e", "Work function"], c: 0, diff: 'Hard' },
+      { q: "Logic: Photodiodes operated in reverse bias?", opts: ["Larger fractional current change", "More current", "Save power", "None"], c: 0, diff: 'Hard' },
+    ],
+    'Chemistry': [
+      { q: "NCERT: Main ore of Aluminum?", opts: ["Bauxite", "Haematite", "Magnetite", "Galena"], c: 0, diff: 'Easy' },
+      { q: "NCERT: Unit of zero order rate constant?", opts: ["mol L-1 s-1", "s-1", "mol-1 L s-1", "None"], c: 0, diff: 'Easy' },
+      { q: "Imp: Strongest ligand?", opts: ["CN-", "Cl-", "F-", "H2O"], c: 0, diff: 'Medium' },
+      { q: "Imp: Phenol + Zinc dust product?", opts: ["Benzene", "Toluene", "Benzoic Acid", "None"], c: 0, diff: 'Medium' },
+      { q: "Assertion: Aniline no Friedel-Crafts. Reason: Salt formation.", opts: ["Both true, R explains A", "Both true, R not A", "A true, R false", "A false"], c: 0, diff: 'Hard' },
+      { q: "Logic: Fluorine strongest oxidant why?", opts: ["Low bond dissociation enthalpy", "High electron gain", "Small size", "None"], c: 0, diff: 'Hard' },
+    ]
+  },
+  'default': [
+    { q: "NCERT: Basic unit of life?", opts: ["Cell", "Tissue", "Organ", "System"], c: 0, diff: 'Easy' },
+    { q: "NCERT: Value of g?", opts: ["9.8", "10", "6.67", "32"], c: 0, diff: 'Easy' },
+    { q: "Imp: Newton's 3rd Law?", opts: ["Action=Reaction", "F=ma", "Inertia", "None"], c: 0, diff: 'Medium' },
+    { q: "Imp: Powerhouse of cell?", opts: ["Mitochondria", "Nucleus", "Golgi", "Ribosome"], c: 0, diff: 'Medium' },
+    { q: "Logic: Earth stops rotating, g at equator?", opts: ["Increases", "Decreases", "Same", "Zero"], c: 0, diff: 'Hard' },
+    { q: "Competency: Why do we fall forward when braking?", opts: ["Inertia of motion", "Inertia of rest", "Force", "Gravity"], c: 0, diff: 'Hard' },
+  ]
+};
+
+/* ========================================================================
+   PART 2: UTILITIES & SERVICES
+   (In a real app, this would be in 'utils/api.js' and 'utils/helpers.js')
+   ======================================================================== */
+
+const apiKey = ""; // API Key provided by environment
+
+// 1. Gemini API Service
+const callGemini = async (prompt) => {
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }]
+        })
+      }
+    );
+    const data = await response.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || "AI couldn't generate a response.";
+  } catch (error) {
+    console.error("Gemini API Error:", error);
+    return "Error connecting to AI. Please try again.";
+  }
+};
+
+// 2. Logic Helpers
+const shuffleArray = (array) => {
+  const newArray = [...array];
+  for (let i = newArray.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+  }
+  return newArray;
+};
+
+const GET_ROAST = (accuracy, correct, total) => {
+  if (accuracy === 100) return { title: "ACADEMIC WEAPON 🤯", msg: "Go touch some grass, genius." };
+  if (accuracy >= 90) return { title: "CHAD BEHAVIOR 🗿", msg: "Your parents might actually be proud today." };
+  if (accuracy >= 80) return { title: "COOKING 🔥", msg: "Not bad, not bad at all." };
+  if (accuracy >= 60) return { title: "MID 😐", msg: "You survived, but at what cost?" };
+  if (accuracy >= 40) return { title: "EMOTIONAL DAMAGE 💀", msg: "We need to have a serious talk about your study habits." };
+  return { title: "COOKED 🍳", msg: "Just guess 'C' next time, it might work better." };
+};
+
+/* ========================================================================
+   PART 3: UI COMPONENTS
+   (In a real app, this would be in 'components/Button.jsx', 'components/ProgressBar.jsx')
+   ======================================================================== */
+
+const SelectionButton = ({ label, onClick, isSelected = false }) => (
+  <button
+    onClick={onClick}
+    className={`
+      w-full p-5 mb-4 text-lg font-medium text-left transition-all duration-200
+      border-2 ${isSelected ? 'border-black bg-gray-100' : 'border-gray-200 hover:border-black'}
+      focus:outline-none focus:ring-0 active:bg-black active:text-white
+    `}
+    style={{ color: COLORS.black }}
+  >
+    {label}
+  </button>
+);
+
+const SegmentedProgressBar = ({ total, results }) => {
+  return (
+    <div className="w-full h-[6px] bg-gray-100 flex mb-6">
+      {results.map((res, idx) => (
+        <div 
+          key={idx}
+          className="h-full transition-all duration-500 ease-out"
+          style={{ 
+            width: `${100 / total}%`,
+            backgroundColor: res === 'correct' ? COLORS.green : COLORS.red
+          }}
+        />
+      ))}
+    </div>
+  );
+};
+
+/* ========================================================================
+   PART 4: MAIN APPLICATION LOGIC
+   (This puts everything together)
+   ======================================================================== */
+
+export default function App() {
+  const [view, setView] = useState('home'); 
+  const [step, setStep] = useState(0); 
+  
+  const [selections, setSelections] = useState({
+    classVal: null,
+    subject: null,
+    difficulty: null,
+    count: null,
+  });
+
+  const [currentQIndex, setCurrentQIndex] = useState(0);
+  const [answers, setAnswers] = useState([]); 
+  const [selectedOption, setSelectedOption] = useState(null); 
+  const [isSubmitted, setIsSubmitted] = useState(false); 
+  
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [testLimit, setTestLimit] = useState(5);
+  
+  // Review & Social
+  const [reviewData, setReviewData] = useState([]);
+  const [showReview, setShowReview] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [sessionHistory, setSessionHistory] = useState(new Set());
+
+  // AI
+  const [explanations, setExplanations] = useState({});
+  const [fetchingExplId, setFetchingExplId] = useState(null);
+
+  const timeoutRef = useRef(null);
+
+  // --- Logic Helpers ---
+
+  const questionPool = useMemo(() => {
+    const classData = QUESTIONS_DB[selections.classVal] || {};
+    let allSubjectQuestions = classData[selections.subject] || QUESTIONS_DB['default'] || [];
+    allSubjectQuestions = [...allSubjectQuestions];
+    
+    // 1. Initial Shuffle
+    allSubjectQuestions = shuffleArray(allSubjectQuestions);
+
+    // 2. Filter by Difficulty
+    let filtered = [];
+    if (selections.difficulty) {
+      filtered = allSubjectQuestions.filter(q => q.diff === selections.difficulty);
+      if (filtered.length < testLimit) {
+        const remainingNeeded = testLimit - filtered.length;
+        const otherQuestions = allSubjectQuestions.filter(q => q.diff !== selections.difficulty);
+        const fillers = shuffleArray(otherQuestions).slice(0, remainingNeeded);
+        filtered = [...filtered, ...fillers];
+      }
+    } else {
+      filtered = allSubjectQuestions;
+    }
+
+    // 3. Smart History (Prioritize unseen)
+    filtered.sort((a, b) => {
+      const aSeen = sessionHistory.has(a.q);
+      const bSeen = sessionHistory.has(b.q);
+      if (aSeen === bSeen) return 0;
+      return aSeen ? 1 : -1; 
+    });
+
+    const finalQuestions = filtered.slice(0, testLimit);
+
+    return finalQuestions.map(q => {
+      const optionsWithStatus = q.opts.map((optText, index) => ({
+        text: optText,
+        isCorrect: index === q.c
+      }));
+      const shuffledOptions = shuffleArray(optionsWithStatus);
+      return {
+        ...q,
+        opts: shuffledOptions.map(o => o.text),
+        c: shuffledOptions.findIndex(o => o.isCorrect)
+      };
+    });
+
+  }, [selections, testLimit]); 
+
+  useEffect(() => {
+    if (view === 'game' && questionPool.length > 0) {
+      setSessionHistory(prev => {
+        const newHistory = new Set(prev);
+        questionPool.forEach(q => newHistory.add(q.q));
+        return newHistory;
+      });
+    }
+  }, [view, questionPool]);
+
+  // --- AI Logic ---
+  const handleGetExplanation = async (idx) => {
+    if (explanations[idx] || fetchingExplId === idx) return;
+
+    const item = reviewData[idx];
+    if (!item) return;
+
+    setFetchingExplId(idx);
+    const prompt = `Explain simply why "${item.correct}" is the correct answer for the question: "${item.q}". Keep it to 1-2 sentences.`;
+    
+    const text = await callGemini(prompt);
+    setExplanations(prev => ({ ...prev, [idx]: text }));
+    setFetchingExplId(null);
+  };
+
+  // --- Actions ---
+
+  const restart = () => {
+    setSelections({ classVal: null, subject: null, difficulty: null, count: null });
+    setAnswers([]);
+    setReviewData([]);
+    setExplanations({});
+    setCurrentQIndex(0);
+    setSelectedOption(null);
+    setIsSubmitted(false);
+    setShowReview(false);
+    setCopied(false);
+    setStep(0);
+    setTimeLeft(0);
+    setTestLimit(5);
+    setView('home');
+    
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+  };
+
+  const startSetup = () => {
+    setView('setup');
+    setStep(0);
+  };
+
+  const handleSelection = (key, value) => {
+    setSelections(prev => ({ ...prev, [key]: value }));
+    
+    if (key === 'count') {
+      const [minStr, maxStr] = value.split('-');
+      const min = parseInt(minStr);
+      const max = maxStr ? parseInt(maxStr) : min;
+      const randomLimit = Math.floor(Math.random() * (max - min + 1)) + min;
+      
+      setTestLimit(randomLimit);
+      setTimeLeft(randomLimit * 60); 
+      setView('game'); 
+      setStep(4);
+      return;
+    }
+    setStep(prev => prev + 1);
+  };
+
+  const handleBack = () => {
+    if (step > 0) {
+      setStep(prev => prev - 1);
+    } else {
+      setView('home');
+    }
+  };
+
+  const finishTest = () => {
+    setStep(5);
+  };
+
+  const handleNextQuestion = (newAnswers) => {
+    if (newAnswers.length >= questionPool.length) {
+      finishTest();
+    } else {
+      setCurrentQIndex(prev => prev + 1);
+      setSelectedOption(null);
+      setIsSubmitted(false);
+    }
+  };
+
+  useEffect(() => {
+    if (view === 'game' && step !== 5 && timeLeft > 0 && !isSubmitted) {
+      const timer = setInterval(() => {
+        setTimeLeft(prev => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            finishTest();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [view, step, timeLeft, isSubmitted]);
+
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+
+  const handleOptionSelect = (index) => {
+    if (isSubmitted) return; 
+    setIsSubmitted(true);
+    setSelectedOption(index);
+    
+    const currentQ = questionPool[currentQIndex % questionPool.length];
+    const isCorrect = index === currentQ.c;
+    
+    const newAnswers = [...answers, isCorrect ? 'correct' : 'wrong'];
+    setAnswers(newAnswers);
+
+    const reviewItem = {
+      q: currentQ.q,
+      selected: currentQ.opts[index],
+      correct: currentQ.opts[currentQ.c],
+      isCorrect: isCorrect
+    };
+    setReviewData(prev => [...prev, reviewItem]);
+
+    timeoutRef.current = setTimeout(() => {
+      handleNextQuestion(newAnswers);
+    }, 800);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
+
+  // --- Views ---
+
+  // 1. HOME SCREEN
+  if (view === 'home') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center font-sans p-6">
+        <div className="w-full max-w-[420px] bg-white p-8 shadow-xl text-center border-t-8 border-black">
+          <h1 className="text-4xl font-black mb-2">QUIZ MASTER</h1>
+          <p className="text-gray-500 mb-8">Test your knowledge</p>
+          <button 
+            onClick={startSetup}
+            className="w-full py-4 bg-black text-white text-xl font-bold hover:bg-gray-800 transition-transform hover:scale-105"
+          >
+            START TEST 🚀
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. SETUP SCREEN
+  if (view === 'setup') {
+    const translateX = `-${step * 100}%`;
+    return (
+      <div className="min-h-screen bg-gray-50 flex justify-center items-center font-sans">
+        <div className="w-full max-w-[420px] h-[100dvh] bg-white relative overflow-hidden shadow-xl border-x border-gray-100">
+          
+          <div className="absolute top-4 left-6 z-10">
+             <button onClick={handleBack} className="text-gray-400 hover:text-black font-bold text-lg transition-colors">
+               ← Back
+             </button>
+          </div>
+
+          <div 
+            className="flex h-full w-full"
+            style={{ 
+              transform: `translateX(${translateX})`,
+              transition: 'transform 500ms cubic-bezier(0.4, 0.0, 0.2, 1)' 
+            }}
+          >
+            {/* Class */}
+            <div className="min-w-full h-full p-6 flex flex-col justify-center">
+              <h1 className="text-3xl font-bold mb-8 text-black">Select Your Class</h1>
+              {Object.keys(MOCK_SUBJECTS).map(c => (
+                <SelectionButton key={c} label={c} onClick={() => handleSelection('classVal', c)} />
+              ))}
+            </div>
+            {/* Subject */}
+            <div className="min-w-full h-full p-6 flex flex-col justify-center">
+              <h1 className="text-3xl font-bold mb-8 text-black">Select Subject</h1>
+              {selections.classVal && MOCK_SUBJECTS[selections.classVal]?.map(s => (
+                <SelectionButton key={s} label={s} onClick={() => handleSelection('subject', s)} />
+              ))}
+            </div>
+            {/* Difficulty */}
+            <div className="min-w-full h-full p-6 flex flex-col justify-center">
+              <h1 className="text-3xl font-bold mb-8 text-black">Select Difficulty</h1>
+              {['Easy', 'Medium', 'Hard'].map(d => (
+                <SelectionButton key={d} label={d} onClick={() => handleSelection('difficulty', d)} />
+              ))}
+            </div>
+            {/* Count */}
+            <div className="min-w-full h-full p-6 flex flex-col justify-center">
+              <h1 className="text-3xl font-bold mb-8 text-black">Question Count</h1>
+              {['5-10', '10-15', '15-20'].map(c => ( 
+                <SelectionButton key={c} label={c} onClick={() => handleSelection('count', c)} />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 3. GAME & RESULTS SCREEN
+  const currentQuestion = questionPool[currentQIndex % questionPool.length];
+  const totalQuestionsToAsk = questionPool.length;
+  const correctCount = answers.filter(a => a === 'correct').length;
+  const wrongCount = answers.filter(a => a === 'wrong').length;
+  const accuracy = answers.length > 0 ? Math.round((correctCount / answers.length) * 100) : 0;
+  
+  const { title: roastTitle, msg: roastMsg } = GET_ROAST(accuracy, correctCount, totalQuestionsToAsk);
+
+  const handleShare = () => {
+    const text = `I scored ${accuracy}% on the ${selections.subject} Test! My rank: ${roastTitle}.`;
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex justify-center items-center font-sans">
+      <div className="w-full max-w-[420px] h-[100dvh] bg-white relative overflow-hidden shadow-xl border-x border-gray-100">
+        
+        {/* GAME SCREEN */}
+        {step !== 5 && (
+          <div className="min-w-full h-full flex flex-col bg-white">
+            <div className="w-full pt-4 px-6 pb-2 bg-white relative">
+              <div className="flex justify-between items-center mb-2">
+                 <button 
+                   onClick={() => { if(confirm('Exit?')) restart(); }} 
+                   className="text-gray-400 hover:text-black font-bold text-xl leading-none"
+                 >
+                   ✕
+                 </button>
+                 <div className={`font-mono font-bold text-lg ${timeLeft < 60 ? 'text-red-600 animate-pulse' : 'text-black'}`}>
+                   {formatTime(timeLeft)}
+                 </div>
+              </div>
+              
+              <SegmentedProgressBar total={totalQuestionsToAsk} results={answers} />
+              
+              <div className="flex justify-between items-center mt-2">
+                <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+                  Question {currentQIndex + 1} / {totalQuestionsToAsk}
+                </p>
+                <span className="text-xs font-bold px-2 py-1 bg-gray-100 rounded text-gray-600 uppercase">
+                  {currentQuestion?.diff || 'General'}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              {currentQuestion ? (
+                <>
+                  <h2 className="text-2xl font-bold text-black mb-8 leading-tight">
+                    <span className="mr-2">{currentQIndex + 1}.</span>
+                    {currentQuestion.q}
+                  </h2>
+                  <div className="space-y-4">
+                    {currentQuestion.opts.map((opt, idx) => {
+                      let borderClass = 'border-black';
+                      let textClass = 'text-black';
+                      let bgClass = 'bg-white';
+                      
+                      if (!isSubmitted) {
+                        if (selectedOption === idx) {
+                           bgClass = 'bg-black text-white';
+                        }
+                      } else {
+                        const isCorrectOption = idx === currentQuestion.c;
+                        const isSelectedOption = idx === selectedOption;
+                        if (isCorrectOption) {
+                          borderClass = 'border-green-600';
+                          textClass = 'text-green-600';
+                          bgClass = 'bg-green-50';
+                        } else if (isSelectedOption && !isCorrectOption) {
+                          borderClass = 'border-red-600';
+                          textClass = 'text-red-600';
+                          bgClass = 'bg-red-50';
+                        } else {
+                          borderClass = 'border-gray-200';
+                          textClass = 'text-gray-400';
+                        }
+                      }
+
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() => handleOptionSelect(idx)}
+                          disabled={isSubmitted}
+                          className={`
+                            w-full p-5 text-lg font-medium text-left border-2 transition-all duration-200
+                            ${borderClass} ${textClass} ${bgClass}
+                          `}
+                        >
+                          <span className="font-bold mr-2">{String.fromCharCode(65 + idx)}.</span> {opt}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              ) : (
+                <div className="flex justify-center items-center h-full">Loading...</div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* RESULTS SCREEN */}
+        {step === 5 && (
+          <div className="min-w-full h-full p-8 flex flex-col items-center overflow-y-auto bg-white">
+            
+            {accuracy >= 80 && (
+              <div className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-hidden">
+                <div className="absolute top-0 left-1/4 w-2 h-2 bg-red-500 rounded-full animate-bounce delay-100"></div>
+                <div className="absolute top-10 left-3/4 w-3 h-3 bg-blue-500 rounded-full animate-bounce delay-200"></div>
+                <div className="absolute top-5 left-1/2 w-2 h-2 bg-green-500 rounded-full animate-bounce delay-300"></div>
+              </div>
+            )}
+
+            <div className="w-full text-center mb-6">
+              <h1 className="text-3xl font-black text-black mb-1">TEST COMPLETE</h1>
+              
+              <div className="mt-4 mb-4">
+                <span className="inline-block px-4 py-1 bg-black text-white text-sm font-bold uppercase tracking-widest transform -rotate-1">
+                  {roastTitle}
+                </span>
+                <p className="mt-2 text-gray-600 italic">"{roastMsg}"</p>
+              </div>
+              
+              <div className="w-16 h-1 bg-gray-200 mx-auto mb-6"></div>
+            </div>
+
+            <div className="w-full grid grid-cols-2 gap-4 mb-6">
+               <div className="p-4 bg-gray-50 rounded text-center border border-gray-100">
+                 <div className="text-2xl font-bold text-black">{answers.length}</div>
+                 <div className="text-xs text-gray-500 uppercase">Total</div>
+               </div>
+               <div className="p-4 bg-gray-50 rounded text-center border border-gray-100">
+                 <div className="text-2xl font-bold text-black">{accuracy}%</div>
+                 <div className="text-xs text-gray-500 uppercase">Accuracy</div>
+               </div>
+               <div className="p-4 bg-green-50 rounded text-center border border-green-100">
+                 <div className="text-2xl font-bold text-green-600">{correctCount}</div>
+                 <div className="text-xs text-green-600 uppercase">Correct</div>
+               </div>
+               <div className="p-4 bg-red-50 rounded text-center border border-red-100">
+                 <div className="text-2xl font-bold text-red-600">{wrongCount}</div>
+                 <div className="text-xs text-red-600 uppercase">Wrong</div>
+               </div>
+            </div>
+
+            <div className="w-full space-y-3 mb-8">
+              <button
+                onClick={handleShare}
+                className="w-full py-4 bg-black text-white text-lg font-bold hover:bg-gray-800 transition-colors shadow-lg flex items-center justify-center gap-2"
+              >
+                {copied ? 'COPIED!' : 'SHARE SCORE 📸'}
+              </button>
+
+              <button
+                onClick={() => setShowReview(!showReview)}
+                className="w-full py-4 border-2 border-gray-200 text-lg font-bold text-gray-700 hover:border-black hover:text-black transition-colors"
+              >
+                {showReview ? 'Hide Review' : 'Review Answers'}
+              </button>
+              
+              <button
+                onClick={restart}
+                className="w-full py-4 border-2 border-black text-black text-lg font-bold hover:bg-gray-50 transition-colors"
+              >
+                MAIN MENU
+              </button>
+            </div>
+
+            {showReview && (
+              <div className="w-full space-y-4 animate-in slide-in-from-bottom-4 duration-500 fade-in pb-8">
+                <h3 className="text-xl font-bold text-black border-b pb-2 mb-4">Detailed Review</h3>
+                {reviewData.map((item, idx) => (
+                  <div key={idx} className={`p-4 border-l-4 rounded bg-gray-50 ${item.isCorrect ? 'border-green-500' : 'border-red-500'}`}>
+                    <div className="flex justify-between items-start mb-2">
+                        <p className="font-bold text-gray-800 text-sm flex-1">Q{idx+1}. {item.q}</p>
+                        
+                        {/* ✨ GEMINI EXPLANATION BUTTON */}
+                        <button 
+                            onClick={() => handleGetExplanation(idx)}
+                            disabled={fetchingExplId === idx}
+                            className="ml-2 text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded hover:bg-indigo-200 transition-colors whitespace-nowrap"
+                        >
+                            {fetchingExplId === idx ? "..." : "✨ Explain"}
+                        </button>
+                    </div>
+
+                    <div className="flex justify-between text-sm mb-2">
+                      <span className={`${item.isCorrect ? 'text-green-700' : 'text-red-700'} font-medium`}>
+                        You: {item.selected}
+                      </span>
+                      {!item.isCorrect && (
+                        <span className="text-green-700 font-medium ml-2">
+                          Ans: {item.correct}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* AI EXPLANATION BOX */}
+                    {explanations[idx] && (
+                        <div className="mt-3 p-3 bg-indigo-50 border border-indigo-100 rounded text-sm text-indigo-900 italic animate-fade-in">
+                            <strong>AI:</strong> {explanations[idx]}
+                        </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
